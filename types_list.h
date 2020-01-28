@@ -1,5 +1,3 @@
-#pragma once 
-
 /*
  * type_list.h
  *
@@ -7,21 +5,26 @@
  *      Author: facs
  */
 
+#ifndef TYPE_LIST_H_
+#define TYPE_LIST_H_
+
 #include <cstddef>
 #include <type_traits>
 #include <exception>
 #include <stdexcept>
+#include <utility>
 
 namespace types_list {
 /********************************************************
 ***********	primitive	********************************/
-template<typename ... Ts>
-struct types{};
 
 template<typename Type>
 struct type {
 	using use = Type;
 };
+
+template<typename ... Ts>
+struct types{ };
 
 template<typename ... Ts>
 constexpr std::size_t size(types<Ts...>) {
@@ -140,11 +143,6 @@ constexpr types<Ts...>pop_front (types<T, Ts...>) {
 
 static_assert(pop_front(types<int, float, double>()) == types<float, double>());
 
-//template<typename T, typename ... Ts>
-//constexpr typesTs...>pop_back (types <Ts..., T>) {
-//	return {};
-//}
-
 /********************************************************
 ***********	contains, find, find_if ********************/
 
@@ -202,7 +200,8 @@ constexpr std::size_t find_if (types<Ts...> tps) {
 }
 
 static_assert(find_if<std::is_pointer>(types<int, float*, double>{}) == 1);
-static_assert(find_if<part_caller<std::is_base_of, std::exception>::type>(types<std::runtime_error, float, double>{}) == 0);
+static_assert(find_if<part_caller<std::is_base_of, std::exception>::type>
+						(types<std::runtime_error, float, double>{}) == 0);
 
 /********************************************************
 ***********	..._of **************************************/
@@ -226,4 +225,47 @@ static_assert(any_of<std::is_pointer>(types<int, float*, double>{}));
 static_assert(all_of<std::is_pointer>(types<int*, float*, double*>{}));
 static_assert(none_of<std::is_pointer>(types<int, float, double>{}));
 
+/********************************************************
+***********	transform ***********************************/
+template<template<class...> class F, typename... Ts>
+constexpr types<typename F<Ts>::type...> transform(types<Ts...>) {
+	return {};
 }
+
+static_assert(transform<std::add_pointer>(types<int, float, double>{}) ==
+		types<int*, float*, double*>{});
+
+/********************************************************
+***********	get *****************************************/
+
+template<std::size_t I, class T>  struct indexed_type {
+  static constexpr std::size_t value = I;
+  using type = T;
+};
+
+template<typename IS, class ... Ts>  struct indexed_types;
+
+template<std::size_t ... Is, class ... Ts>
+struct indexed_types<std::index_sequence<Is...>, Ts...> {
+	struct type : indexed_type<Is, Ts>...{};
+};
+
+template<class... Ts>
+using indexed_types_for =
+		typename indexed_types<std::index_sequence_for<Ts...>, Ts...>::type;
+
+template<std::size_t I, class T>
+constexpr type<T> get_indexed_type(indexed_type<I,T>) { return {}; }
+
+template<std::size_t I, class... Ts>
+constexpr auto get(types<Ts...>) {
+	return get_indexed_type<I>(indexed_types_for<Ts...>{});
+}
+
+
+static_assert(get<1>(types<double, int, char>{}) == type<int>{});
+
+
+}
+#endif /* TYPE_LIST_H_ */
+
